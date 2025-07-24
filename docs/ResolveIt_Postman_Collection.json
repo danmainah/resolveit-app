@@ -1,0 +1,518 @@
+{
+  "info": {
+    "name": "ResolveIt API",
+    "description": "API collection for ResolveIt dispute resolution platform",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:5000/api",
+      "type": "string"
+    },
+    {
+      "key": "token",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "item": [
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "Register User",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "name",
+                  "value": "John Doe",
+                  "type": "text"
+                },
+                {
+                  "key": "email",
+                  "value": "john@example.com",
+                  "type": "text"
+                },
+                {
+                  "key": "phone",
+                  "value": "+1234567890",
+                  "type": "text"
+                },
+                {
+                  "key": "password",
+                  "value": "Password123",
+                  "type": "text"
+                },
+                {
+                  "key": "age",
+                  "value": "30",
+                  "type": "text"
+                },
+                {
+                  "key": "gender",
+                  "value": "MALE",
+                  "type": "text"
+                },
+                {
+                  "key": "address[street]",
+                  "value": "123 Main Street",
+                  "type": "text"
+                },
+                {
+                  "key": "address[city]",
+                  "value": "New York",
+                  "type": "text"
+                },
+                {
+                  "key": "address[zipCode]",
+                  "value": "10001",
+                  "type": "text"
+                },
+                {
+                  "key": "photo",
+                  "type": "file",
+                  "src": []
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/register",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "register"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Login User",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const response = pm.response.json();",
+                  "    pm.collectionVariables.set('token', response.token);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"john@example.com\",\n  \"password\": \"Password123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "login"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Verify Token",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/auth/verify",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "verify"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Cases",
+      "item": [
+        {
+          "name": "Register Case",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "caseType",
+                  "value": "FAMILY",
+                  "type": "text"
+                },
+                {
+                  "key": "issueDescription",
+                  "value": "This is a detailed description of the family dispute involving property division and child custody matters. The issue started when...",
+                  "type": "text"
+                },
+                {
+                  "key": "oppositeParty[name]",
+                  "value": "Jane Doe",
+                  "type": "text"
+                },
+                {
+                  "key": "oppositeParty[email]",
+                  "value": "jane@example.com",
+                  "type": "text"
+                },
+                {
+                  "key": "oppositeParty[phone]",
+                  "value": "+1234567891",
+                  "type": "text"
+                },
+                {
+                  "key": "oppositeParty[address]",
+                  "value": "456 Oak Street, New York, NY 10002",
+                  "type": "text"
+                },
+                {
+                  "key": "isCourtPending",
+                  "value": "false",
+                  "type": "text"
+                },
+                {
+                  "key": "documents",
+                  "type": "file",
+                  "src": []
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/cases/register",
+              "host": ["{{baseUrl}}"],
+              "path": ["cases", "register"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get My Cases",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/cases/my-cases?page=1&limit=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["cases", "my-cases"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                },
+                {
+                  "key": "status",
+                  "value": "PENDING",
+                  "disabled": true
+                },
+                {
+                  "key": "type",
+                  "value": "FAMILY",
+                  "disabled": true
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Case Details",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/cases/:caseId",
+              "host": ["{{baseUrl}}"],
+              "path": ["cases", ":caseId"],
+              "variable": [
+                {
+                  "key": "caseId",
+                  "value": "case-uuid-here"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Case Status",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"ACCEPTED\",\n  \"description\": \"Case has been accepted for mediation\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/cases/:caseId/status",
+              "host": ["{{baseUrl}}"],
+              "path": ["cases", ":caseId", "status"],
+              "variable": [
+                {
+                  "key": "caseId",
+                  "value": "case-uuid-here"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Admin",
+      "item": [
+        {
+          "name": "Get Dashboard Stats",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/admin/dashboard/stats",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "dashboard", "stats"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get All Cases",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/admin/cases?page=1&limit=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "cases"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                },
+                {
+                  "key": "status",
+                  "value": "PENDING",
+                  "disabled": true
+                },
+                {
+                  "key": "type",
+                  "value": "FAMILY",
+                  "disabled": true
+                },
+                {
+                  "key": "search",
+                  "value": "john",
+                  "disabled": true
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create Panel",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"memberIds\": [\n    {\n      \"userId\": \"lawyer-uuid\",\n      \"role\": \"LAWYER\"\n    },\n    {\n      \"userId\": \"scholar-uuid\",\n      \"role\": \"RELIGIOUS_SCHOLAR\"\n    },\n    {\n      \"userId\": \"expert-uuid\",\n      \"role\": \"SOCIAL_EXPERT\"\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/admin/cases/:caseId/panel",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "cases", ":caseId", "panel"],
+              "variable": [
+                {
+                  "key": "caseId",
+                  "value": "case-uuid-here"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Panel Members",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/admin/panel-members",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "panel-members"],
+              "query": [
+                {
+                  "key": "role",
+                  "value": "LAWYER",
+                  "disabled": true
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Verify User",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"isVerified\": true\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/admin/users/:userId/verify",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "users", ":userId", "verify"],
+              "variable": [
+                {
+                  "key": "userId",
+                  "value": "user-uuid-here"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Users",
+      "item": [
+        {
+          "name": "Get Profile",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/users/profile",
+              "host": ["{{baseUrl}}"],
+              "path": ["users", "profile"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Notifications",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/users/notifications?page=1&limit=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["users", "notifications"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                },
+                {
+                  "key": "unreadOnly",
+                  "value": "true",
+                  "disabled": true
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Mark Notification Read",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/users/notifications/:notificationId/read",
+              "host": ["{{baseUrl}}"],
+              "path": ["users", "notifications", ":notificationId", "read"],
+              "variable": [
+                {
+                  "key": "notificationId",
+                  "value": "notification-uuid-here"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Mark All Notifications Read",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/users/notifications/read-all",
+              "host": ["{{baseUrl}}"],
+              "path": ["users", "notifications", "read-all"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Health Check",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/health",
+          "host": ["{{baseUrl}}"],
+          "path": ["health"]
+        }
+      },
+      "response": []
+    }
+  ]
+}

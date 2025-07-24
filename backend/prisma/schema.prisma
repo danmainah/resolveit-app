@@ -1,0 +1,203 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id          String   @id @default(uuid())
+  name        String
+  email       String   @unique
+  phone       String   @unique
+  password    String
+  age         Int
+  gender      Gender
+  address     Address?
+  photo       String?
+  role        UserRole @default(USER)
+  isVerified  Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  casesAsPlaintiff Case[] @relation("PlaintiffCases")
+  casesAsDefendant Case[] @relation("DefendantCases")
+  panelMemberships PanelMember[]
+  notifications    Notification[]
+
+  @@map("users")
+}
+
+model Address {
+  id       String @id @default(uuid())
+  street   String
+  city     String
+  zipCode  String
+  userId   String @unique
+  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("addresses")
+}
+
+model Case {
+  id                    String     @id @default(uuid())
+  caseType              CaseType
+  issueDescription      String
+  isCourtPending        Boolean    @default(false)
+  caseNumber            String?
+  firNumber             String?
+  courtPoliceStation    String?
+  status                CaseStatus @default(PENDING)
+  createdAt             DateTime   @default(now())
+  updatedAt             DateTime   @updatedAt
+
+  // Relations
+  plaintiffId           String
+  plaintiff             User       @relation("PlaintiffCases", fields: [plaintiffId], references: [id])
+  
+  defendantId           String?
+  defendant             User?      @relation("DefendantCases", fields: [defendantId], references: [id])
+  
+  oppositePartyDetails  OppositeParty?
+  documents             Document[]
+  panel                 Panel?
+  caseUpdates           CaseUpdate[]
+  notifications         Notification[]
+
+  @@map("cases")
+}
+
+model OppositeParty {
+  id      String @id @default(uuid())
+  name    String
+  email   String?
+  phone   String?
+  address String?
+  caseId  String @unique
+  case    Case   @relation(fields: [caseId], references: [id], onDelete: Cascade)
+
+  @@map("opposite_parties")
+}
+
+model Document {
+  id       String       @id @default(uuid())
+  filename String
+  filepath String
+  fileType DocumentType
+  fileSize Int
+  caseId   String
+  case     Case         @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  uploadedAt DateTime   @default(now())
+
+  @@map("documents")
+}
+
+model Panel {
+  id        String   @id @default(uuid())
+  caseId    String   @unique
+  case      Case     @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  
+  members   PanelMember[]
+
+  @@map("panels")
+}
+
+model PanelMember {
+  id       String     @id @default(uuid())
+  panelId  String
+  panel    Panel      @relation(fields: [panelId], references: [id], onDelete: Cascade)
+  userId   String
+  user     User       @relation(fields: [userId], references: [id])
+  role     PanelRole
+  
+  @@unique([panelId, userId])
+  @@map("panel_members")
+}
+
+model CaseUpdate {
+  id          String   @id @default(uuid())
+  caseId      String
+  case        Case     @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  status      CaseStatus
+  description String
+  createdAt   DateTime @default(now())
+
+  @@map("case_updates")
+}
+
+model Notification {
+  id        String           @id @default(uuid())
+  userId    String
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  caseId    String?
+  case      Case?            @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  type      NotificationType
+  title     String
+  message   String
+  isRead    Boolean          @default(false)
+  createdAt DateTime         @default(now())
+
+  @@map("notifications")
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+}
+
+enum UserRole {
+  USER
+  ADMIN
+  LAWYER
+  RELIGIOUS_SCHOLAR
+  SOCIAL_EXPERT
+}
+
+enum CaseType {
+  FAMILY
+  BUSINESS
+  CRIMINAL
+  PROPERTY
+  OTHER
+}
+
+enum CaseStatus {
+  PENDING
+  AWAITING_RESPONSE
+  ACCEPTED
+  PANEL_CREATED
+  MEDIATION_IN_PROGRESS
+  RESOLVED
+  UNRESOLVED
+  REJECTED
+}
+
+enum DocumentType {
+  IMAGE
+  VIDEO
+  AUDIO
+  PDF
+  OTHER
+}
+
+enum PanelRole {
+  LAWYER
+  RELIGIOUS_SCHOLAR
+  SOCIAL_EXPERT
+}
+
+enum NotificationType {
+  CASE_UPDATE
+  PANEL_INVITATION
+  MEDIATION_SCHEDULED
+  CASE_RESOLVED
+  SYSTEM
+}
