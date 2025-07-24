@@ -107,21 +107,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       })
 
-      const response = await api.post('/auth/register', formData, {
+      await api.post('/auth/register', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
       })
 
-      const { user, token } = response.data
-
-      setUser(user)
-      setToken(token)
-      localStorage.setItem('token', token)
-      api.defaults.headers.common['Authorization'] = `Bearer ${token}`
-
-      toast.success('Registration successful!')
-      router.push('/dashboard')
+      toast.success('Registration successful! Please login with your credentials.')
+      router.push('/auth/login')
     } catch (error: any) {
       const message = error.response?.data?.message || 'Registration failed'
       toast.error(message)

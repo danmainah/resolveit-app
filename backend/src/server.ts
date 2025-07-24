@@ -5,6 +5,7 @@ import rateLimit from 'express-rate-limit'
 import { createServer } from 'http'
 import { Server } from 'socket.io'
 import path from 'path'
+import session from 'express-session'
 
 import { config } from './config/env'
 import authRoutes from './routes/auth'
@@ -13,6 +14,16 @@ import caseRoutes from './routes/cases'
 import adminRoutes from './routes/admin'
 import { errorHandler } from './middleware/errorHandler'
 import { setupSocketHandlers } from './socket/socketHandlers'
+import { 
+  apiRateLimit, 
+  authRateLimit, 
+  sanitizeInput, 
+  preventSQLInjection, 
+  validateFileUpload, 
+  limitRequestSize, 
+  preventParameterPollution, 
+  securityHeaders 
+} from './middleware/security'
 
 const app = express();
 const server = createServer(app);
@@ -26,19 +37,41 @@ const io = new Server(server, {
 const PORT = process.env.PORT || 5000;
 
 // Security middleware
-app.use(helmet());
-app.use(cors({
-  origin: process.env.CORS_ORIGIN || "http://localhost:3000",
-  credentials: true
+app.use(helmet({
+  contentSecurityPolicy: false, // We'll handle this in our custom middleware
+  crossOriginEmbedderPolicy: false
 }));
 
+app.use(cors({
+  origin: process.env.CORS_ORIGIN || "http://localhost:3000",
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token']
+}));
+
+// Session middleware for CSRF protection
+app.use(session({
+  secret: process.env.JWT_SECRET || 'fallback-secret',
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    secure: process.env.NODE_ENV === 'production',
+    httpOnly: true,
+    maxAge: 24 * 60 * 60 * 1000 // 24 hours
+  }
+}));
+
+// Security middleware stack
+app.use(securityHeaders);
+app.use(limitRequestSize);
+app.use(preventParameterPollution);
+app.use(sanitizeInput);
+app.use(preventSQLInjection);
+app.use(validateFileUpload);
+
 // Rate limiting
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // limit each IP to 100 requests per windowMs
-  message: 'Too many requests from this IP, please try again later.'
-});
-app.use(limiter);
+app.use('/api', apiRateLimit);
+app.use('/api/auth', authRateLimit);
 
 // Body parsing middleware
 app.use(express.json({ limit: '10mb' }));

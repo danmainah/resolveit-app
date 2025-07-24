@@ -54,6 +54,10 @@ model Case {
   firNumber             String?
   courtPoliceStation    String?
   status                CaseStatus @default(PENDING)
+  oppositePartyResponse OppositePartyResponse @default(PENDING)
+  mediationStartDate    DateTime?
+  mediationEndDate      DateTime?
+  resolutionDetails     String?
   createdAt             DateTime   @default(now())
   updatedAt             DateTime   @updatedAt
 
@@ -199,5 +203,12 @@ enum NotificationType {
   PANEL_INVITATION
   MEDIATION_SCHEDULED
   CASE_RESOLVED
+  OPPOSITE_PARTY_CONTACTED
   SYSTEM
+}
+
+enum OppositePartyResponse {
+  PENDING
+  ACCEPTED
+  REJECTED
 }

@@ -1,17 +1,17 @@
-import express from 'express';
+import express, { Request, Response, NextFunction, Router } from 'express';
 import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
+import jwt, { SignOptions } from 'jsonwebtoken';
 import prisma from '../config/database';
 import { validateUserRegistration, validateLogin } from '../middleware/validation';
 import { upload } from '../middleware/upload';
 
-const router = express.Router();
+const router: Router = express.Router();
 
 // Register user
-router.post('/register', upload.single('photo'), validateUserRegistration, async (req, res, next) => {
+router.post('/register', upload.single('photo'), validateUserRegistration, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { name, email, phone, password, age, gender, address } = req.body;
-    
+
     // Check if user already exists
     const existingUser = await prisma.user.findFirst({
       where: {
@@ -57,8 +57,8 @@ router.post('/register', upload.single('photo'), validateUserRegistration, async
     // Generate JWT token
     const token = jwt.sign(
       { userId: user.id },
-      process.env.JWT_SECRET!,
-      { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
+      process.env.JWT_SECRET as string,
+      { expiresIn: '7d' }
     );
 
     // Remove password from response
@@ -75,7 +75,7 @@ router.post('/register', upload.single('photo'), validateUserRegistration, async
 });
 
 // Login user
-router.post('/login', validateLogin, async (req, res, next) => {
+router.post('/login', validateLogin, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { email, password } = req.body;
 
@@ -104,8 +104,8 @@ router.post('/login', validateLogin, async (req, res, next) => {
     // Generate JWT token
     const token = jwt.sign(
       { userId: user.id },
-      process.env.JWT_SECRET!,
-      { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
+      process.env.JWT_SECRET as string,
+      { expiresIn: '7d' }
     );
 
     // Remove password from response
@@ -122,7 +122,7 @@ router.post('/login', validateLogin, async (req, res, next) => {
 });
 
 // Verify token
-router.get('/verify', async (req, res, next) => {
+router.get('/verify', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1];
@@ -131,25 +131,12 @@ router.get('/verify', async (req, res, next) => {
       return res.status(401).json({ message: 'No token provided' });
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET!) as any;
-    
+    const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as { userId: string };
+
     const user = await prisma.user.findUnique({
       where: { id: decoded.userId },
       include: {
         address: true
-      },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        phone: true,
-        age: true,
-        gender: true,
-        photo: true,
-        role: true,
-        isVerified: true,
-        address: true,
-        createdAt: true
       }
     });
 

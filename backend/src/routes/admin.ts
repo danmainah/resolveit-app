@@ -1,12 +1,12 @@
-import express from 'express';
+import express, { Request, Response, NextFunction, Router } from 'express';
 import prisma from '../config/database';
 import { authenticateToken, requireAdmin } from '../middleware/auth';
 import { io } from '../server';
 
-const router = express.Router();
+const router: Router = express.Router();
 
 // Get dashboard statistics
-router.get('/dashboard/stats', authenticateToken, requireAdmin, async (req, res, next) => {
+router.get('/dashboard/stats', authenticateToken, requireAdmin, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const [
       totalCases,
@@ -19,12 +19,12 @@ router.get('/dashboard/stats', authenticateToken, requireAdmin, async (req, res,
     ] = await Promise.all([
       prisma.case.count(),
       prisma.case.count({ where: { status: 'PENDING' } }),
-      prisma.case.count({ 
-        where: { 
-          status: { 
-            in: ['AWAITING_RESPONSE', 'ACCEPTED', 'PANEL_CREATED', 'MEDIATION_IN_PROGRESS'] 
-          } 
-        } 
+      prisma.case.count({
+        where: {
+          status: {
+            in: ['AWAITING_RESPONSE', 'ACCEPTED', 'PANEL_CREATED', 'MEDIATION_IN_PROGRESS']
+          }
+        }
       }),
       prisma.case.count({ where: { status: 'RESOLVED' } }),
       prisma.case.count({ where: { status: 'UNRESOLVED' } }),
@@ -93,7 +93,7 @@ router.get('/dashboard/stats', authenticateToken, requireAdmin, async (req, res,
         totalUsers,
         resolutionRate: totalCases > 0 ? ((resolvedCases / totalCases) * 100).toFixed(1) : 0
       },
-      caseTypeDistribution: caseTypeStats.map(stat => ({
+      caseTypeDistribution: caseTypeStats.map((stat: any) => ({
         type: stat.caseType,
         count: stat._count.id
       })),
@@ -109,13 +109,13 @@ router.get('/dashboard/stats', authenticateToken, requireAdmin, async (req, res,
 });
 
 // Get all cases with filters
-router.get('/cases', authenticateToken, requireAdmin, async (req, res, next) => {
+router.get('/cases', authenticateToken, requireAdmin, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { 
-      status, 
-      type, 
-      page = 1, 
-      limit = 20, 
+    const {
+      status,
+      type,
+      page = 1,
+      limit = 20,
       search,
       sortBy = 'createdAt',
       sortOrder = 'desc'
@@ -227,7 +227,7 @@ router.get('/cases', authenticateToken, requireAdmin, async (req, res, next) => 
 });
 
 // Create panel for a case
-router.post('/cases/:id/panel', authenticateToken, requireAdmin, async (req, res, next) => {
+router.post('/cases/:id/panel', authenticateToken, requireAdmin, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
     const { memberIds } = req.body; // Array of user IDs with their roles
@@ -243,8 +243,8 @@ router.post('/cases/:id/panel', authenticateToken, requireAdmin, async (req, res
 
     const roles = memberIds.map((m: any) => m.role);
     const requiredRoles = ['LAWYER', 'RELIGIOUS_SCHOLAR', 'SOCIAL_EXPERT'];
-    
-    const hasAllRequiredRoles = requiredRoles.every(role => 
+
+    const hasAllRequiredRoles = requiredRoles.every(role =>
       roles.includes(role)
     );
 
@@ -328,7 +328,7 @@ router.post('/cases/:id/panel', authenticateToken, requireAdmin, async (req, res
 });
 
 // Get available panel members
-router.get('/panel-members', authenticateToken, requireAdmin, async (req, res, next) => {
+router.get('/panel-members', authenticateToken, requireAdmin, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { role } = req.query;
 
@@ -367,8 +367,317 @@ router.get('/panel-members', authenticateToken, requireAdmin, async (req, res, n
   }
 });
 
+// Contact opposite party
+router.post('/cases/:id/contact-opposite-party', authenticateToken, requireAdmin, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+    const { message } = req.body;
+
+    // Update case status
+    await prisma.case.update({
+      where: { id },
+      data: { status: 'AWAITING_RESPONSE' }
+    });
+
+    // Create case update
+    await prisma.caseUpdate.create({
+      data: {
+        caseId: id,
+        status: 'AWAITING_RESPONSE',
+        description: message || 'Opposite party has been contacted for mediation'
+      }
+    });
+
+    // Create notification for plaintiff
+    const case_ = await prisma.case.findUnique({
+      where: { id },
+      include: { plaintiff: true }
+    });
+
+    if (case_) {
+      await prisma.notification.create({
+        data: {
+          userId: case_.plaintiffId,
+          caseId: id,
+          type: 'OPPOSITE_PARTY_CONTACTED',
+          title: 'Opposite Party Contacted',
+          message: 'The opposite party has been contacted regarding your case'
+        }
+      });
+    }
+
+    // Emit real-time update
+    io.emit('caseUpdate', {
+      caseId: id,
+      status: 'AWAITING_RESPONSE',
+      message: 'Opposite party contacted'
+    });
+
+    res.json({
+      message: 'Opposite party contacted successfully'
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Update opposite party response
+router.patch('/cases/:id/opposite-party-response', authenticateToken, requireAdmin, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+    const { response, defendantId } = req.body; // ACCEPTED or REJECTED
+
+    const updateData: any = {
+      oppositePartyResponse: response
+    };
+
+    if (response === 'ACCEPTED') {
+      updateData.status = 'ACCEPTED';
+      if (defendantId) {
+        updateData.defendantId = defendantId;
+      }
+    } else {
+      updateData.status = 'REJECTED';
+    }
+
+    await prisma.case.update({
+      where: { id },
+      data: updateData
+    });
+
+    // Create case update
+    await prisma.caseUpdate.create({
+      data: {
+        caseId: id,
+        status: response === 'ACCEPTED' ? 'ACCEPTED' : 'REJECTED',
+        description: `Opposite party ${response.toLowerCase()} mediation`
+      }
+    });
+
+    // Create notification for plaintiff
+    const case_ = await prisma.case.findUnique({
+      where: { id },
+      include: { plaintiff: true }
+    });
+
+    if (case_) {
+      await prisma.notification.create({
+        data: {
+          userId: case_.plaintiffId,
+          caseId: id,
+          type: 'CASE_UPDATE',
+          title: 'Case Update',
+          message: `Opposite party has ${response.toLowerCase()} mediation for your case`
+        }
+      });
+    }
+
+    // Emit real-time update
+    io.emit('caseUpdate', {
+      caseId: id,
+      status: updateData.status,
+      message: `Opposite party ${response.toLowerCase()} mediation`
+    });
+
+    res.json({
+      message: `Opposite party response updated to ${response}`
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Start mediation
+router.post('/cases/:id/start-mediation', authenticateToken, requireAdmin, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+    const { scheduledDate } = req.body;
+
+    await prisma.case.update({
+      where: { id },
+      data: {
+        status: 'MEDIATION_IN_PROGRESS',
+        mediationStartDate: new Date(scheduledDate)
+      }
+    });
+
+    // Create case update
+    await prisma.caseUpdate.create({
+      data: {
+        caseId: id,
+        status: 'MEDIATION_IN_PROGRESS',
+        description: `Mediation started on ${new Date(scheduledDate).toLocaleDateString()}`
+      }
+    });
+
+    // Get case with participants
+    const case_ = await prisma.case.findUnique({
+      where: { id },
+      include: {
+        plaintiff: true,
+        defendant: true,
+        panel: {
+          include: {
+            members: true
+          }
+        }
+      }
+    });
+
+    if (case_) {
+      // Create notifications for all participants
+      const notifications = [];
+
+      // Plaintiff notification
+      notifications.push({
+        userId: case_.plaintiffId,
+        caseId: id,
+        type: 'MEDIATION_SCHEDULED' as any,
+        title: 'Mediation Started',
+        message: 'Mediation for your case has started'
+      });
+
+      // Defendant notification
+      if (case_.defendantId) {
+        notifications.push({
+          userId: case_.defendantId,
+          caseId: id,
+          type: 'MEDIATION_SCHEDULED' as any,
+          title: 'Mediation Started',
+          message: 'Mediation for the case has started'
+        });
+      }
+
+      // Panel member notifications
+      if (case_.panel) {
+        case_.panel.members.forEach((member: any) => {
+          notifications.push({
+            userId: member.userId,
+            caseId: id,
+            type: 'MEDIATION_SCHEDULED' as any,
+            title: 'Mediation Started',
+            message: 'Mediation for your assigned case has started'
+          });
+        });
+      }
+
+      await prisma.notification.createMany({
+        data: notifications
+      });
+    }
+
+    // Emit real-time update
+    io.emit('caseUpdate', {
+      caseId: id,
+      status: 'MEDIATION_IN_PROGRESS',
+      message: 'Mediation started'
+    });
+
+    res.json({
+      message: 'Mediation started successfully'
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Resolve case
+router.post('/cases/:id/resolve', authenticateToken, requireAdmin, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+    const { resolution, resolutionDetails } = req.body; // RESOLVED or UNRESOLVED
+
+    await prisma.case.update({
+      where: { id },
+      data: {
+        status: resolution,
+        mediationEndDate: new Date(),
+        resolutionDetails
+      }
+    });
+
+    // Create case update
+    await prisma.caseUpdate.create({
+      data: {
+        caseId: id,
+        status: resolution,
+        description: resolutionDetails || `Case ${resolution.toLowerCase()}`
+      }
+    });
+
+    // Get case with participants
+    const case_ = await prisma.case.findUnique({
+      where: { id },
+      include: {
+        plaintiff: true,
+        defendant: true,
+        panel: {
+          include: {
+            members: true
+          }
+        }
+      }
+    });
+
+    if (case_) {
+      // Create notifications for all participants
+      const notifications = [];
+
+      // Plaintiff notification
+      notifications.push({
+        userId: case_.plaintiffId,
+        caseId: id,
+        type: 'CASE_RESOLVED' as any,
+        title: 'Case Resolved',
+        message: `Your case has been ${resolution.toLowerCase()}`
+      });
+
+      // Defendant notification
+      if (case_.defendantId) {
+        notifications.push({
+          userId: case_.defendantId,
+          caseId: id,
+          type: 'CASE_RESOLVED' as any,
+          title: 'Case Resolved',
+          message: `The case has been ${resolution.toLowerCase()}`
+        });
+      }
+
+      // Panel member notifications
+      if (case_.panel) {
+        case_.panel.members.forEach((member: any) => {
+          notifications.push({
+            userId: member.userId,
+            caseId: id,
+            type: 'CASE_RESOLVED' as any,
+            title: 'Case Resolved',
+            message: `The case you were mediating has been ${resolution.toLowerCase()}`
+          });
+        });
+      }
+
+      await prisma.notification.createMany({
+        data: notifications
+      });
+    }
+
+    // Emit real-time update
+    io.emit('caseUpdate', {
+      caseId: id,
+      status: resolution,
+      message: `Case ${resolution.toLowerCase()}`
+    });
+
+    res.json({
+      message: `Case ${resolution.toLowerCase()} successfully`
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 // Update user verification status
-router.patch('/users/:id/verify', authenticateToken, requireAdmin, async (req, res, next) => {
+router.patch('/users/:id/verify', authenticateToken, requireAdmin, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
     const { isVerified } = req.body;
@@ -390,7 +699,7 @@ router.patch('/users/:id/verify', authenticateToken, requireAdmin, async (req, r
         userId: id,
         type: 'SYSTEM',
         title: isVerified ? 'Account Verified' : 'Account Verification Revoked',
-        message: isVerified 
+        message: isVerified
           ? 'Your account has been verified. You can now register cases.'
           : 'Your account verification has been revoked.'
       }

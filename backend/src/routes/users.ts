@@ -1,13 +1,13 @@
-import express, { Router } from 'express';
+import express, { Router, Request, Response, NextFunction } from 'express';
 import prisma from '../config/database';
 import { authenticateToken } from '../middleware/auth';
 
 const router: Router = express.Router();
 
 // Get user profile
-router.get('/profile', authenticateToken, async (req, res, next) => {
+router.get('/profile', authenticateToken, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const userId = req.user!.id;
+    const userId = (req as any).user.id;
 
     const user = await prisma.user.findUnique({
       where: { id: userId },
@@ -20,20 +20,6 @@ router.get('/profile', authenticateToken, async (req, res, next) => {
             panelMemberships: true
           }
         }
-      },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        phone: true,
-        age: true,
-        gender: true,
-        photo: true,
-        role: true,
-        isVerified: true,
-        createdAt: true,
-        address: true,
-        _count: true
       }
     });
 
@@ -48,9 +34,9 @@ router.get('/profile', authenticateToken, async (req, res, next) => {
 });
 
 // Get user notifications
-router.get('/notifications', authenticateToken, async (req, res, next) => {
+router.get('/notifications', authenticateToken, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const userId = req.user!.id;
+    const userId = (req as any).user.id;
     const { page = 1, limit = 20, unreadOnly = false } = req.query;
 
     const where: any = { userId };
@@ -100,10 +86,10 @@ router.get('/notifications', authenticateToken, async (req, res, next) => {
 });
 
 // Mark notification as read
-router.patch('/notifications/:id/read', authenticateToken, async (req, res, next) => {
+router.patch('/notifications/:id/read', authenticateToken, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
-    const userId = req.user!.id;
+    const userId = (req as any).user.id;
 
     const notification = await prisma.notification.updateMany({
       where: {
@@ -126,9 +112,9 @@ router.patch('/notifications/:id/read', authenticateToken, async (req, res, next
 });
 
 // Mark all notifications as read
-router.patch('/notifications/read-all', authenticateToken, async (req, res, next) => {
+router.patch('/notifications/read-all', authenticateToken, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const userId = req.user!.id;
+    const userId = (req as any).user.id;
 
     await prisma.notification.updateMany({
       where: {

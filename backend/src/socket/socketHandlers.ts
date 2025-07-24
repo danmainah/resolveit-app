@@ -1,23 +1,28 @@
-import { Server } from 'socket.io';
+import { Server, Socket } from 'socket.io';
 import jwt from 'jsonwebtoken';
 import prisma from '../config/database';
 
 interface AuthenticatedSocket extends Socket {
   userId?: string;
+  user?: {
+    id: string;
+    name: string;
+    role: string;
+  };
 }
 
 export const setupSocketHandlers = (io: Server) => {
   // Authentication middleware for socket connections
-  io.use(async (socket: any, next) => {
+  io.use(async (socket: AuthenticatedSocket, next) => {
     try {
       const token = socket.handshake.auth.token;
-      
+
       if (!token) {
         return next(new Error('Authentication error'));
       }
 
-      const decoded = jwt.verify(token, process.env.JWT_SECRET!) as any;
-      
+      const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as { userId: string };
+
       const user = await prisma.user.findUnique({
         where: { id: decoded.userId },
         select: { id: true, name: true, role: true }
@@ -35,26 +40,26 @@ export const setupSocketHandlers = (io: Server) => {
     }
   });
 
-  io.on('connection', (socket: any) => {
-    console.log(`User ${socket.user.name} connected`);
+  io.on('connection', (socket: AuthenticatedSocket) => {
+    console.log(`User ${socket.user!.name} connected`);
 
     // Join user to their personal room for notifications
     socket.join(`user_${socket.userId}`);
 
     // Join admin users to admin room
-    if (socket.user.role === 'ADMIN') {
+    if (socket.user!.role === 'ADMIN') {
       socket.join('admin_room');
     }
 
     // Handle case updates
     socket.on('joinCase', (caseId: string) => {
       socket.join(`case_${caseId}`);
-      console.log(`User ${socket.user.name} joined case ${caseId}`);
+      console.log(`User ${socket.user!.name} joined case ${caseId}`);
     });
 
     socket.on('leaveCase', (caseId: string) => {
       socket.leave(`case_${caseId}`);
-      console.log(`User ${socket.user.name} left case ${caseId}`);
+      console.log(`User ${socket.user!.name} left case ${caseId}`);
     });
 
     // Handle mediation session events
@@ -62,7 +67,7 @@ export const setupSocketHandlers = (io: Server) => {
       socket.join(`mediation_${caseId}`);
       socket.to(`mediation_${caseId}`).emit('userJoinedSession', {
         userId: socket.userId,
-        userName: socket.user.name
+        userName: socket.user!.name
       });
     });
 
@@ -70,7 +75,7 @@ export const setupSocketHandlers = (io: Server) => {
       socket.leave(`mediation_${caseId}`);
       socket.to(`mediation_${caseId}`).emit('userLeftSession', {
         userId: socket.userId,
-        userName: socket.user.name
+        userName: socket.user!.name
       });
     });
 
@@ -82,7 +87,7 @@ export const setupSocketHandlers = (io: Server) => {
     }) => {
       socket.to(`mediation_${data.caseId}`).emit('newMediationMessage', {
         userId: socket.userId,
-        userName: socket.user.name,
+        userName: socket.user!.name,
         message: data.message,
         timestamp: data.timestamp
       });
@@ -92,13 +97,13 @@ export const setupSocketHandlers = (io: Server) => {
     socket.on('typing', (data: { caseId: string; isTyping: boolean }) => {
       socket.to(`mediation_${data.caseId}`).emit('userTyping', {
         userId: socket.userId,
-        userName: socket.user.name,
+        userName: socket.user!.name,
         isTyping: data.isTyping
       });
     });
 
     socket.on('disconnect', () => {
-      console.log(`User ${socket.user.name} disconnected`);
+      console.log(`User ${socket.user!.name} disconnected`);
     });
   });
 

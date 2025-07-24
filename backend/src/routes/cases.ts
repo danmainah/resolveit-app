@@ -1,19 +1,19 @@
-import express from 'express';
+import express, { Request, Response, NextFunction, Router } from 'express';
 import prisma from '../config/database';
 import { authenticateToken, requireVerified } from '../middleware/auth';
 import { validateCaseRegistration } from '../middleware/validation';
 import { upload, getDocumentType } from '../middleware/upload';
 import { io } from '../server';
 
-const router = express.Router();
+const router: Router = express.Router();
 
 // Register a new case
-router.post('/register', 
-  authenticateToken, 
+router.post('/register',
+  authenticateToken,
   requireVerified,
   upload.array('documents', 10),
   validateCaseRegistration,
-  async (req, res, next) => {
+  async (req: Request, res: Response, next: NextFunction) => {
     try {
       const {
         caseType,
@@ -25,7 +25,7 @@ router.post('/register',
         courtPoliceStation
       } = req.body;
 
-      const userId = req.user.id;
+      const userId = (req as any).user.id;
       const files = req.files as Express.Multer.File[];
 
       // Create case with opposite party details
@@ -109,9 +109,9 @@ router.post('/register',
 );
 
 // Get user's cases
-router.get('/my-cases', authenticateToken, async (req, res, next) => {
+router.get('/my-cases', authenticateToken, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const userId = req.user.id;
+    const userId = (req as any).user.id;
     const { status, type, page = 1, limit = 10 } = req.query;
 
     const where: any = {
@@ -197,10 +197,10 @@ router.get('/my-cases', authenticateToken, async (req, res, next) => {
 });
 
 // Get case details
-router.get('/:id', authenticateToken, async (req, res, next) => {
+router.get('/:id', authenticateToken, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
-    const userId = req.user.id;
+    const userId = (req as any).user.id;
 
     const caseDetails = await prisma.case.findFirst({
       where: {
@@ -276,14 +276,14 @@ router.get('/:id', authenticateToken, async (req, res, next) => {
 });
 
 // Update case status (for admin/panel members)
-router.patch('/:id/status', authenticateToken, async (req, res, next) => {
+router.patch('/:id/status', authenticateToken, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
     const { status, description } = req.body;
-    const userId = req.user.id;
+    const userId = (req as any).user.id;
 
     // Check if user has permission to update case status
-    const hasPermission = req.user.role === 'ADMIN' || 
+    const hasPermission = (req as any).user.role === 'ADMIN' ||
       await prisma.panelMember.findFirst({
         where: {
           userId,
