@@ -9,7 +9,10 @@
     "start": "node dist/server.js",
     "migrate": "prisma migrate dev",
     "generate": "prisma generate",
-    "studio": "prisma studio"
+    "studio": "prisma studio",
+    "seed": "ts-node src/utils/seed.ts",
+    "security-test": "ts-node src/utils/securityTests.ts",
+    "security-audit": "npm audit && npm run security-test"
   },
   "dependencies": {
     "@prisma/client": "^5.7.1",

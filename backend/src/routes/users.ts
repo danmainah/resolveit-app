@@ -1,6 +1,42 @@
 import express, { Router, Request, Response, NextFunction } from 'express';
+import multer from 'multer';
+import path from 'path';
+import fs from 'fs';
 import prisma from '../config/database';
 import { authenticateToken } from '../middleware/auth';
+
+// Configure multer for file uploads
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const uploadDir = path.join(__dirname, '../../uploads');
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+    cb(null, uploadDir);
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, 'profile-' + uniqueSuffix + path.extname(file.originalname));
+  }
+});
+
+const upload = multer({
+  storage,
+  limits: {
+    fileSize: 5 * 1024 * 1024 // 5MB limit
+  },
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = /jpeg|jpg|png|gif/;
+    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+    const mimetype = allowedTypes.test(file.mimetype);
+
+    if (mimetype && extname) {
+      return cb(null, true);
+    } else {
+      cb(new Error('Only image files are allowed'));
+    }
+  }
+});
 
 const router: Router = express.Router();
 
@@ -28,6 +64,84 @@ router.get('/profile', authenticateToken, async (req: Request, res: Response, ne
     }
 
     res.json({ user });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Update user profile
+router.put('/profile', authenticateToken, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = (req as any).user.id;
+    const { name, phone, address } = req.body;
+
+    const updatedUser = await prisma.user.update({
+      where: { id: userId },
+      data: {
+        name,
+        phone,
+        ...(address && {
+          address: {
+            upsert: {
+              create: {
+                street: address.street || '',
+                city: address.city || '',
+                zipCode: address.zipCode || ''
+              },
+              update: {
+                street: address.street || '',
+                city: address.city || '',
+                zipCode: address.zipCode || ''
+              }
+            }
+          }
+        })
+      },
+      include: {
+        address: true
+      }
+    });
+
+    res.json(updatedUser);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Upload profile photo
+router.post('/profile/photo', authenticateToken, upload.single('photo'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = (req as any).user.id;
+    
+    if (!req.file) {
+      return res.status(400).json({ message: 'No file uploaded' });
+    }
+
+    // Delete old photo if exists
+    const existingUser = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { photo: true }
+    });
+
+    if (existingUser?.photo) {
+      const oldPhotoPath = path.join(__dirname, '../../uploads', existingUser.photo);
+      if (fs.existsSync(oldPhotoPath)) {
+        fs.unlinkSync(oldPhotoPath);
+      }
+    }
+
+    // Update user with new photo filename
+    const updatedUser = await prisma.user.update({
+      where: { id: userId },
+      data: { photo: req.file.filename },
+      include: { address: true }
+    });
+
+    res.json({ 
+      message: 'Photo uploaded successfully',
+      photo: req.file.filename,
+      user: updatedUser
+    });
   } catch (error) {
     next(error);
   }

@@ -41,8 +41,6 @@ export const setupSocketHandlers = (io: Server) => {
   });
 
   io.on('connection', (socket: AuthenticatedSocket) => {
-    console.log(`User ${socket.user!.name} connected`);
-
     // Join user to their personal room for notifications
     socket.join(`user_${socket.userId}`);
 
@@ -54,12 +52,10 @@ export const setupSocketHandlers = (io: Server) => {
     // Handle case updates
     socket.on('joinCase', (caseId: string) => {
       socket.join(`case_${caseId}`);
-      console.log(`User ${socket.user!.name} joined case ${caseId}`);
     });
 
     socket.on('leaveCase', (caseId: string) => {
       socket.leave(`case_${caseId}`);
-      console.log(`User ${socket.user!.name} left case ${caseId}`);
     });
 
     // Handle mediation session events

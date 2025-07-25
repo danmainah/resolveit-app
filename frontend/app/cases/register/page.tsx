@@ -237,7 +237,7 @@ export default function RegisterCasePage() {
 
                 <div>
                   <label htmlFor="oppositePartyPhone" className="block text-sm font-medium text-gray-700">
-                    Phone (Optional)
+                    Phone
                   </label>
                   <input
                     {...register('oppositeParty.phone')}

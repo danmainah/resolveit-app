@@ -40,6 +40,8 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     { name: 'Dashboard', href: '/dashboard', icon: Home },
     { name: 'My Cases', href: '/cases', icon: FileText },
     { name: 'Register Case', href: '/cases/register', icon: FileText },
+    { name: 'Resources', href: '/resources', icon: FileText },
+    { name: 'Workshops', href: '/workshops', icon: Users },
     { name: 'Notifications', href: '/notifications', icon: Bell, badge: notifications },
     { name: 'Profile', href: '/profile', icon: Users },
   ]
@@ -49,6 +51,8 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     { name: 'All Cases', href: '/admin/cases', icon: FileText },
     { name: 'Users', href: '/admin/users', icon: Users },
     { name: 'Panel Members', href: '/admin/panel-members', icon: Shield },
+    { name: 'Manage Resources', href: '/admin/resources', icon: FileText },
+    { name: 'Manage Workshops', href: '/admin/workshops', icon: Users },
   ]
 
   const handleLogout = () => {

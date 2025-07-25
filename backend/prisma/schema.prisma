@@ -30,6 +30,9 @@ model User {
   casesAsDefendant Case[] @relation("DefendantCases")
   panelMemberships PanelMember[]
   notifications    Notification[]
+  resourceProgress UserResourceProgress[]
+  workshopRegistrations WorkshopRegistration[]
+  agreementSignatures AgreementSignature[]
 
   @@map("users")
 }
@@ -73,6 +76,7 @@ model Case {
   panel                 Panel?
   caseUpdates           CaseUpdate[]
   notifications         Notification[]
+  agreement             Agreement?
 
   @@map("cases")
 }
@@ -160,6 +164,7 @@ enum Gender {
 enum UserRole {
   USER
   ADMIN
+  PANEL_MEMBER
   LAWYER
   RELIGIOUS_SCHOLAR
   SOCIAL_EXPERT
@@ -204,6 +209,10 @@ enum NotificationType {
   MEDIATION_SCHEDULED
   CASE_RESOLVED
   OPPOSITE_PARTY_CONTACTED
+  WORKSHOP_REMINDER
+  WORKSHOP_CANCELLED
+  RESOURCE_PUBLISHED
+  AGREEMENT_READY
   SYSTEM
 }
 
@@ -211,4 +220,141 @@ enum OppositePartyResponse {
   PENDING
   ACCEPTED
   REJECTED
+}
+
+// Educational Resources Models
+model Resource {
+  id          String      @id @default(uuid())
+  title       String
+  description String
+  content     String      // Rich text content
+  type        ResourceType
+  category    String
+  videoUrl    String?
+  thumbnailUrl String?
+  author      String
+  isPublished Boolean     @default(false)
+  viewCount   Int         @default(0)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  
+  tags        ResourceTag[]
+  userProgress UserResourceProgress[]
+
+  @@map("resources")
+}
+
+model ResourceTag {
+  id         String @id @default(uuid())
+  name       String @unique
+  resources  Resource[]
+
+  @@map("resource_tags")
+}
+
+model UserResourceProgress {
+  id         String   @id @default(uuid())
+  userId     String
+  resourceId String
+  completed  Boolean  @default(false)
+  progress   Int      @default(0) // Percentage
+  lastAccessed DateTime @default(now())
+  
+  user       User     @relation(fields: [userId], references: [id])
+  resource   Resource @relation(fields: [resourceId], references: [id])
+  
+  @@unique([userId, resourceId])
+  @@map("user_resource_progress")
+}
+
+model Workshop {
+  id          String   @id @default(uuid())
+  title       String
+  description String
+  instructor  String
+  maxParticipants Int
+  scheduledAt DateTime
+  duration    Int      // in minutes
+  meetingUrl  String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  
+  registrations WorkshopRegistration[]
+
+  @@map("workshops")
+}
+
+model WorkshopRegistration {
+  id         String   @id @default(uuid())
+  userId     String
+  workshopId String
+  registeredAt DateTime @default(now())
+  attended   Boolean  @default(false)
+  
+  user       User     @relation(fields: [userId], references: [id])
+  workshop   Workshop @relation(fields: [workshopId], references: [id])
+  
+  @@unique([userId, workshopId])
+  @@map("workshop_registrations")
+}
+
+// Agreement Generation Models
+model AgreementTemplate {
+  id          String   @id @default(uuid())
+  name        String
+  description String
+  content     String   // Template with placeholders
+  category    String
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  
+  agreements  Agreement[]
+
+  @@map("agreement_templates")
+}
+
+model Agreement {
+  id          String   @id @default(uuid())
+  caseId      String   @unique
+  templateId  String
+  content     String   // Filled template
+  status      AgreementStatus @default(DRAFT)
+  createdAt   DateTime @default(now())
+  signedAt    DateTime?
+  
+  case        Case     @relation(fields: [caseId], references: [id])
+  template    AgreementTemplate @relation(fields: [templateId], references: [id])
+  signatures  AgreementSignature[]
+
+  @@map("agreements")
+}
+
+model AgreementSignature {
+  id          String   @id @default(uuid())
+  agreementId String
+  userId      String
+  signedAt    DateTime @default(now())
+  ipAddress   String
+  userAgent   String
+  
+  agreement   Agreement @relation(fields: [agreementId], references: [id])
+  user        User      @relation(fields: [userId], references: [id])
+  
+  @@unique([agreementId, userId])
+  @@map("agreement_signatures")
+}
+
+enum ResourceType {
+  ARTICLE
+  VIDEO
+  WORKSHOP
+  GUIDE
+  TEMPLATE
+}
+
+enum AgreementStatus {
+  DRAFT
+  PENDING_SIGNATURES
+  SIGNED
+  EXECUTED
 }

@@ -83,8 +83,13 @@ export const sanitizeInput = (req: Request, res: Response, next: NextFunction) =
 
 // CSRF protection middleware
 export const csrfProtection = (req: Request, res: Response, next: NextFunction) => {
-  // Skip CSRF for GET requests and API endpoints with proper authentication
-  if (req.method === 'GET' || req.path.startsWith('/api/auth/')) {
+  // Skip CSRF for GET requests, OPTIONS, and CSRF token endpoint
+  if (req.method === 'GET' || req.method === 'OPTIONS' || req.path === '/api/auth/csrf-token') {
+    return next();
+  }
+
+  // Skip CSRF for login and register (they don't have session yet)
+  if (req.path === '/api/auth/login' || req.path === '/api/auth/register') {
     return next();
   }
 

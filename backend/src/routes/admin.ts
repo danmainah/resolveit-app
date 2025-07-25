@@ -1,5 +1,6 @@
 import express, { Request, Response, NextFunction, Router } from 'express';
 import prisma from '../config/database';
+import { UserRole } from '@prisma/client';
 import { authenticateToken, requireAdmin } from '../middleware/auth';
 import { io } from '../server';
 
@@ -28,7 +29,7 @@ router.get('/dashboard/stats', authenticateToken, requireAdmin, async (req: Requ
       }),
       prisma.case.count({ where: { status: 'RESOLVED' } }),
       prisma.case.count({ where: { status: 'UNRESOLVED' } }),
-      prisma.user.count({ where: { role: 'USER' } }),
+      prisma.user.count({ where: { role: UserRole.USER } }),
       prisma.case.findMany({
         take: 10,
         orderBy: { createdAt: 'desc' },
@@ -327,29 +328,23 @@ router.post('/cases/:id/panel', authenticateToken, requireAdmin, async (req: Req
   }
 });
 
-// Get available panel members
+// Get panel members
 router.get('/panel-members', authenticateToken, requireAdmin, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { role } = req.query;
-
-    const where: any = {
-      role: {
-        in: ['LAWYER', 'RELIGIOUS_SCHOLAR', 'SOCIAL_EXPERT']
-      },
-      isVerified: true
-    };
-
-    if (role) {
-      where.role = role;
-    }
-
     const members = await prisma.user.findMany({
-      where,
+      where: {
+        role: {
+          in: [UserRole.LAWYER, UserRole.RELIGIOUS_SCHOLAR, UserRole.SOCIAL_EXPERT]
+        },
+        isVerified: true
+      },
       select: {
         id: true,
         name: true,
         email: true,
+        phone: true,
         role: true,
+        createdAt: true,
         _count: {
           select: {
             panelMemberships: true
@@ -362,6 +357,92 @@ router.get('/panel-members', authenticateToken, requireAdmin, async (req: Reques
     });
 
     res.json({ members });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Add panel members
+router.post('/panel-members', authenticateToken, requireAdmin, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { assignments } = req.body; // Array of { userId, role }
+
+    if (!Array.isArray(assignments) || assignments.length === 0) {
+      return res.status(400).json({ message: 'Assignments array is required' });
+    }
+
+    // Validate roles
+    const validRoles = [UserRole.LAWYER, UserRole.RELIGIOUS_SCHOLAR, UserRole.SOCIAL_EXPERT];
+    const invalidAssignments = assignments.filter(a => !validRoles.includes(a.role));
+
+    if (invalidAssignments.length > 0) {
+      return res.status(400).json({
+        message: 'Invalid roles provided. Must be LAWYER, RELIGIOUS_SCHOLAR, or SOCIAL_EXPERT'
+      });
+    }
+
+    // Update users with their specific panel roles
+    const updatePromises = assignments.map(({ userId, role }) =>
+      prisma.user.update({
+        where: {
+          id: userId,
+          role: UserRole.USER
+        },
+        data: { role }
+      })
+    );
+
+    const updatedUsers = await Promise.all(updatePromises);
+
+    res.json({
+      message: `${updatedUsers.length} users added as panel members`,
+      count: updatedUsers.length,
+      users: updatedUsers
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Remove panel member
+router.delete('/panel-members/:id', authenticateToken, requireAdmin, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+
+    // Update user back to regular user role
+    const updatedUser = await prisma.user.update({
+      where: { id },
+      data: {
+        role: UserRole.USER
+      }
+    });
+
+    res.json({
+      message: 'Panel member removed successfully',
+      user: updatedUser
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Update panel member status
+router.patch('/panel-members/:id/status', authenticateToken, requireAdmin, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+
+    // For now, we'll just update the user's verification status
+    // In a more complex system, you might have a separate panel member status
+    const updatedUser = await prisma.user.update({
+      where: { id },
+      data: { isVerified: status === 'ACTIVE' }
+    });
+
+    res.json({
+      message: 'Panel member status updated',
+      user: updatedUser
+    });
   } catch (error) {
     next(error);
   }

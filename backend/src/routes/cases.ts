@@ -1,7 +1,7 @@
 import express, { Request, Response, NextFunction, Router } from 'express';
 import prisma from '../config/database';
 import { authenticateToken, requireVerified } from '../middleware/auth';
-import { validateCaseRegistration } from '../middleware/validation';
+import { validateCaseCreation, handleValidationErrors } from '../middleware/validation';
 import { upload, getDocumentType } from '../middleware/upload';
 import { io } from '../server';
 
@@ -12,7 +12,8 @@ router.post('/register',
   authenticateToken,
   requireVerified,
   upload.array('documents', 10),
-  validateCaseRegistration,
+  validateCaseCreation,
+  handleValidationErrors,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const {

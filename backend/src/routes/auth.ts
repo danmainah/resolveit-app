@@ -1,11 +1,21 @@
 import express, { Request, Response, NextFunction, Router } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt, { SignOptions } from 'jsonwebtoken';
+import crypto from 'crypto';
 import prisma from '../config/database';
 import { validateUserRegistration, validateLogin } from '../middleware/validation';
 import { upload } from '../middleware/upload';
+import { authenticateToken } from '../middleware/auth';
 
 const router: Router = express.Router();
+
+// CSRF token endpoint
+router.get('/csrf-token', (req: Request, res: Response) => {
+  const csrfToken = crypto.randomBytes(32).toString('hex');
+  (req.session as any).csrfToken = csrfToken;
+  
+  res.json({ csrfToken });
+});
 
 // Register user
 router.post('/register', upload.single('photo'), validateUserRegistration, async (req: Request, res: Response, next: NextFunction) => {

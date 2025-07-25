@@ -12,6 +12,9 @@ import authRoutes from './routes/auth'
 import userRoutes from './routes/users'
 import caseRoutes from './routes/cases'
 import adminRoutes from './routes/admin'
+import resourceRoutes from './routes/resources'
+import workshopRoutes from './routes/workshops'
+import agreementRoutes from './routes/agreements'
 import { errorHandler } from './middleware/errorHandler'
 import { setupSocketHandlers } from './socket/socketHandlers'
 import { 
@@ -22,7 +25,8 @@ import {
   validateFileUpload, 
   limitRequestSize, 
   preventParameterPollution, 
-  securityHeaders 
+  securityHeaders,
+  csrfProtection
 } from './middleware/security'
 
 const app = express();
@@ -46,7 +50,7 @@ app.use(cors({
   origin: process.env.CORS_ORIGIN || "http://localhost:3000",
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token']
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token', 'X-Requested-With']
 }));
 
 // Session middleware for CSRF protection
@@ -68,6 +72,7 @@ app.use(preventParameterPollution);
 app.use(sanitizeInput);
 app.use(preventSQLInjection);
 app.use(validateFileUpload);
+app.use(csrfProtection);
 
 // Rate limiting
 app.use('/api', apiRateLimit);
@@ -77,14 +82,21 @@ app.use('/api/auth', authRateLimit);
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Static files
-app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+// Static files with CORS headers
+app.use('/uploads', (req, res, next) => {
+  res.header('Cross-Origin-Resource-Policy', 'cross-origin');
+  res.header('Access-Control-Allow-Origin', process.env.CORS_ORIGIN || 'http://localhost:3000');
+  next();
+}, express.static(path.join(__dirname, '../uploads')));
 
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/cases', caseRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/resources', resourceRoutes);
+app.use('/api/workshops', workshopRoutes);
+app.use('/api/agreements', agreementRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
